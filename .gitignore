@@ -22,3 +22,8 @@ _testmain.go
 *.exe
 *.test
 *.prof
+
+# Angular 2 client
+client/node_modules
+client/typings
+client/dist
