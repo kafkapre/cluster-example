@@ -1,0 +1,1 @@
+ curl -H "Content-Type: application/json" -X POST -d '{"id":"3", "name": "Jan", "text": "Ahoj svete" , "parent_id":"nil" , "ip_address":"localhost" }' localhost:3000/comments
