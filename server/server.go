@@ -8,6 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/mediocregopher/radix.v2/redis"
+        "github.com/patrickmn/go-cache"
 	"os"
 )
 
@@ -115,6 +116,18 @@ func httpPostPerson(c *gin.Context, redis *redis.Client) {
 }
 
 func httpGetComments(c *gin.Context, commentMap map[string]Comment ) {
+    
+        timestamp := c.Query("timestamp")
+        from := c.Query("from")
+        to := c.DefaultQuery("to", "aaaaa")
+        x := c.DefaultQuery("x", "bbbb")
+        
+        fmt.Println("timestamp: ", timestamp)
+        fmt.Println("from: ", from)
+        fmt.Println("to: ", to)
+        fmt.Println("x: ", x)
+    
+    
 	c.JSON(http.StatusOK, gin.H{
 		"count":  len(commentMap),
 	})
@@ -129,7 +142,7 @@ func httpPostComment(c *gin.Context, commentMap map[string]Comment) {
 	}
 
 	if (len(comment.ParentId) == 0) {
-			comment.ParentId = nil
+			//comment.ParentId = nil
 	}
 
 
@@ -150,6 +163,26 @@ func main() {
 		syscall.Exit(1)
 	}
 	*/
+        
+        c := cache.New(10 * time.Second, 2*time.Second)
+        c.Set("foo", "bar", cache.DefaultExpiration)
+        if foo, found := c.Get("foo");  found {
+            fmt.Println("11111 " , foo)
+        }
+        
+        
+        time.Sleep(5 * time.Second)
+        
+        
+        if foo, found := c.Get("foo");  found {
+            fmt.Println("2222 ", foo)
+        }else {
+            
+            
+        
+        fmt.Println("3333 ", found)
+        }
+        
 
 	commentMap := make(map[string]Comment)
 
