@@ -5,20 +5,25 @@ import (
 	"fmt"
 	"net/http"
 	"time"
+	"log"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"github.com/mediocregopher/radix.v2/redis"
-        "github.com/patrickmn/go-cache"
-	"os"
+  "github.com/patrickmn/go-cache"
+	"gopkg.in/mgo.v2"
+	"gopkg.in/mgo.v2/bson"
 )
 
-type Person struct {
-	Id      string `json:"id"`
-	Name    string `json:"name"`
-	Surname string `json:"surname"`
+type CommentA struct {
+	IdMongo bson.ObjectId `bson:"_id,omitempty"`
+	Name string `json:"name"`
+	Text string `json:"text"`
+	ParentId string `json:"parent_id"`
+	IpAddress string `json:"ip_address"`
 }
 
 type Comment struct {
+
 	Id string `json:"id"`
 	Name string `json:"name"`
 	Text string `json:"text"`
@@ -26,108 +31,19 @@ type Comment struct {
 	IpAddress string `json:"ip_address"`
 }
 
-func createKey(id string)  string {
-	return "persons/" + id
-}
-
-func (p Person) storePerson(redis *redis.Client)  (string, error){
-	key := createKey(p.Id)
-	return redis.Cmd("HMSET", key, "id", p.Id, "name", p.Name, "surname", p.Surname).Str()
-}
-
-func fetchPerson(redis *redis.Client, key string) (Person, error) {
-	res, err := redis.Cmd("HMGET", key, "id", "name", "surname").List()
-	return Person{Id:res[0], Name:res[1], Surname:res[2]}, err
-}
-
-func existPerson(redis *redis.Client, id string)  (bool, error) {
-	res, err := redis.Cmd("EXISTS", createKey(id)).Int()
-	return (res == 1), err
-}
-
-func httpGetPersons(c *gin.Context, redis *redis.Client) {
-	var (
-		result gin.H
-	)
-	id := c.Param("id")
-
-	exist, err := existPerson(redis, id)
-	if err != nil {
-		c.AbortWithError(http.StatusInternalServerError, err)
-	} else if  !exist {
-		result = gin.H{"Msg": "Not found"}
-		c.JSON(http.StatusNotFound, result)
-	} else {
-		person, err := fetchPerson(redis, createKey(id))
-		if err != nil {
-			c.AbortWithError(http.StatusInternalServerError, err)
-		} else {
-			result = gin.H{"person": person}
-			c.JSON(http.StatusOK, result)
-		}
-	}
-}
-
-func httpGetAllPersons(c *gin.Context, redis *redis.Client) {
-	var (
-		persons []Person
-	)
-
-	list, err := redis.Cmd("KEYS", "*").List()
-	if err != nil {
-		c.AbortWithError(http.StatusInternalServerError, err)
-	}
-
-	for _, key := range list{
-		p, err:= fetchPerson(redis, key)
-		if err != nil {
-			fmt.Print(err.Error())
-		}else{
-			persons = append(persons, p)
-		}
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"persons": persons,
-		"count":  len(persons),
-	})
-}
-
-
-
-
-func httpPostPerson(c *gin.Context, redis *redis.Client) {
-	var p Person
-	c.BindJSON(&p)
-
-	if (len(p.Id) == 0) {
-		c.JSON(http.StatusBadRequest, gin.H{"message": "Id cannot be empty."})
-	}else {
-		exist, err := existPerson(redis, p.Id)
-		if err != nil {
-			c.AbortWithError(http.StatusInternalServerError, err)
-		} else if  exist {
-			result := gin.H{"Msg": fmt.Sprintf("Person with id: %s already exists.", p.Id) }
-			c.JSON(http.StatusNotFound, result)
-		}else {
-			//httpStorePerson(c, redis, p)
-		}
-	}
-}
-
 func httpGetComments(c *gin.Context, commentMap map[string]Comment ) {
-    
+
         timestamp := c.Query("timestamp")
         from := c.Query("from")
         to := c.DefaultQuery("to", "aaaaa")
         x := c.DefaultQuery("x", "bbbb")
-        
+
         fmt.Println("timestamp: ", timestamp)
         fmt.Println("from: ", from)
         fmt.Println("to: ", to)
         fmt.Println("x: ", x)
-    
-    
+
+
 	c.JSON(http.StatusOK, gin.H{
 		"count":  len(commentMap),
 	})
@@ -156,39 +72,69 @@ func httpPostComment(c *gin.Context, commentMap map[string]Comment) {
 
 func main() {
 
-	/*
-	redis := connectToRedis()
-	if redis == nil {
-		fmt.Println("Attempts to connect to redis faild. Server will be stoped")
-		syscall.Exit(1)
-	}
-	*/
-        
-        c := cache.New(10 * time.Second, 2*time.Second)
-        c.Set("foo", "bar", cache.DefaultExpiration)
-        if foo, found := c.Get("foo");  found {
-            fmt.Println("11111 " , foo)
-        }
-        
-        
-        time.Sleep(5 * time.Second)
-        
-        
-        if foo, found := c.Get("foo");  found {
-            fmt.Println("2222 ", foo)
-        }else {
-            
-            
-        
-        fmt.Println("3333 ", found)
-        }
-        
+
+	mongo, err := mgo.Dial("mymongo.org")
+  if err != nil {
+          panic(err)
+  }
+  defer mongo.Close()
+	mongo.SetMode(mgo.Monotonic, true)
+
+
+	mongoServerDb := mongo.DB("serverdb").C("comments")
+
+	start := time.Now()
+	for i := 1; i <= 0; i++ {
+		id:=strconv.Itoa(i)
+
+		text:= "xcv " + id + " lablal"
+		err = mongoServerDb.Insert(&Comment{"" ,"Ales", text, "parentid neco", "121.22.11.1"})
+		 if err != nil {
+						 log.Fatal(err)
+		 }
+ 	}
+	elapsed := time.Since(start)
+  log.Printf("Binomial took %s", elapsed)
+
+	 var result []CommentA
+	 err = mongoServerDb.Find(bson.M{"name": "Ales"}).Sort("-$natural").Skip(3).Limit(20).All(&result)
+	 if err != nil {
+					 log.Fatal(err)
+	 }
+
+	 //fmt.Println("Results All: ", result)
+
+
+	 for key, value := range result {
+	 		fmt.Println("Phone:", key, " ", value.IdMongo.Hex(), " ", value )
+		}
+
+
+  c := cache.New(10 * time.Second, 2*time.Second)
+  c.Set("foo", "bar", cache.DefaultExpiration)
+  if foo, found := c.Get("foo");  found {
+      fmt.Println("11111 " , foo)
+  }
+
+
+  // time.Sleep(5 * time.Second)
+	//
+	//
+  // if foo, found := c.Get("foo");  found {
+  //     fmt.Println("2222 ", foo)
+  // }else {
+	//
+	//
+	//
+  // fmt.Println("3333 ", found)
+  // }
+
 
 	commentMap := make(map[string]Comment)
 
-	x:= commentMap["asda"]
-	l:= len(commentMap)
-	fmt.Println("Key:", x, l)
+	// x:= commentMap["asda"]
+	// l:= len(commentMap)
+	// fmt.Println("Key:", x, l)
 
 	router := gin.Default()
 
@@ -199,32 +145,4 @@ func main() {
 	router.POST("/comments", func(c *gin.Context) {httpPostComment(c, commentMap)})
 
 	router.Run(":3000")
-}
-
-func connectToRedis()  (*redis.Client){
-		url:=obtainRedisUrl()
-		for i:=0; i < 20; i++ {
-				redisClient, err := redis.Dial("tcp", url)
-				if err == nil {
-						fmt.Println("Connected to redis.")
-						return redisClient
-				}
-				fmt.Printf("Tried to connect to redis [attempt: %d].\n", i)
-				time.Sleep(5 * time.Second)
-		}
-		return nil
-}
-
-func obtainRedisUrl() string {
-	redisIp := os.Getenv("REDIS_IP")
-	redisPort := os.Getenv("REDIS_PORT")
-
-	if len(redisIp) == 0 {
-		redisIp = "localhost"
-	}
-	if len(redisPort) == 0 {
-		redisPort="6379"
-	}
-
-	return redisIp + ":" + redisPort
 }

@@ -12,6 +12,7 @@ ENV PATH $GOPATH/bin:$PATH
 RUN go get "github.com/gin-gonic/gin"
 RUN go get "github.com/mediocregopher/radix.v2/..."
 RUN go get "github.com/patrickmn/go-cache"
+RUN go get "gopkg.in/mgo.v2"
 
 RUN mkdir -p /opt/SimpleCrudServer
 COPY server.go /opt/SimpleCrudServer
