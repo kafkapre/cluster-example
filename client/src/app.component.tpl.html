@@ -16,6 +16,9 @@
 </form>
 
 
+
+<h1 *ngFor="#c of comments">**{{c.id}} - {{c.author}} **</h1>
+
 <!-- <form (ngSubmit)="getCountriesByRegion()">
     <label>Region:</label>
     <input type="text" [(ngModel)]="region" required>
